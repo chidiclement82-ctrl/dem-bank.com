@@ -1,5 +1,6 @@
 #!/bin/sh
 # Wraps index.html (a page fragment) in a full HTML document for hosting.
+# Writes dist/index.html (used by Netlify) and docs/index.html (used by GitHub Pages).
 set -e
 mkdir -p dist
 {
@@ -11,3 +12,5 @@ mkdir -p dist
   cat index.html
   printf '\n%s\n' '</body>' '</html>'
 } > dist/index.html
+mkdir -p docs
+cp dist/index.html docs/index.html

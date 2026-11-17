@@ -8,4 +8,11 @@ A single-page online banking site with a customer side and a staff back office.
 
 All data is kept in the browser's local storage, so customers and staff must use the same browser. There is no server yet.
 
-To view it, open `index.html` in a browser.
+## Publishing
+
+`index.html` is the source. Run `sh build.sh` after editing it; this writes the complete page to:
+
+- `dist/index.html` for Netlify (see `netlify.toml`)
+- `docs/index.html` for GitHub Pages (Settings > Pages > Deploy from a branch > `main` / `/docs`)
+
+Commit `docs/index.html` along with your change so GitHub Pages picks it up.

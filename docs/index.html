@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>DEM Bank</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:wght@700&display=swap">
+<style>
+/* Layout: a ledger-first banking app. Side rail on desktop, bottom tabs on phone; one black-and-gold balance panel carries the weight, everything else stays quiet. */
+:root {
+  --bg: #F4F3F0; --surface: #FFFFFF; --ink: #141414; --muted: #5F5C55; --line: #DDDAD3;
+  --brand: #141414; --brand-ink: #E8C36A; --soft: #ECE9E2;
+  --hero-bg: #111111; --hero-fg: #F6F1E4; --hero-muted: #C9A85A;
+  --gold: #A9801C; --pos: #1F6B4A; --neg: #B3362B;
+  --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0B0B0B; --surface: #151515; --ink: #EFEBE2; --muted: #A19C90; --line: #2A2925;
+  --brand: #D9B55A; --brand-ink: #121212; --soft: #1F1E1B;
+  --hero-bg: #1A1814; --hero-fg: #F6F1E4; --hero-muted: #C9A85A;
+  --gold: #D9B55A; --pos: #6FD3A4; --neg: #F0857A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0B0B0B; --surface: #151515; --ink: #EFEBE2; --muted: #A19C90; --line: #2A2925;
+  --brand: #D9B55A; --brand-ink: #121212; --soft: #1F1E1B;
+  --hero-bg: #1A1814; --hero-fg: #F6F1E4; --hero-muted: #C9A85A;
+  --gold: #D9B55A; --pos: #6FD3A4; --neg: #F0857A; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--body); }
+h1, h2, h3, p { margin: 0 }
+h1, h2 { font-family: var(--display); text-wrap: balance; letter-spacing: -0.01em }
+h1 { font-size: 26px; font-weight: 700; line-height: 1.15 }
+h2 { font-size: 17px; font-weight: 500 }
+button, input, select { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap }
+.muted { color: var(--muted) }
+.label { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600 }
+
+.shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; gap: 28px }
+.rail { position: sticky; top: calc(20px + env(safe-area-inset-top, 0px)); align-self: start; display: flex; flex-direction: column; gap: 22px }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 19px var(--display) }
+.brand svg { flex: none }
+.wm { display: flex; flex-direction: column; line-height: 0.9; font: 700 1.42em/0.9 "Cormorant Garamond", Georgia, "Times New Roman", serif; letter-spacing: 0.14em }
+.wm small { font: 600 0.33em var(--body); letter-spacing: 0.56em; color: var(--muted); margin-top: 5px; padding-left: 1px }
+.card .brandline { display: flex; align-items: center; gap: 10px; position: relative; z-index: 1 }
+.card .wm small { color: var(--hero-muted) }
+.nav { display: flex; flex-direction: column; gap: 2px }
+.nav a { padding: 9px 12px; border-radius: 9px; text-decoration: none; color: var(--muted); font-weight: 500 }
+.nav a:hover { color: var(--ink) }
+.nav a[aria-current="page"] { background: var(--soft); color: var(--ink) }
+.rail-foot { display: flex; flex-direction: column; gap: 10px; font-size: 13px }
+.rail-foot select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); width: 100% }
+.demo-m { display: none }
+.demo { font-size: 12.5px; color: var(--muted); border-left: 2px solid var(--gold); padding-left: 10px }
+
+main { min-width: 0; display: flex; flex-direction: column; gap: 22px }
+.view { display: flex; flex-direction: column; gap: 22px }
+.head { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap }
+
+.hero { background: var(--hero-bg); color: var(--hero-fg); border-radius: 20px; padding: 26px 28px; display: flex; flex-wrap: wrap; gap: 20px 48px; align-items: end; justify-content: space-between }
+.hero .label { color: var(--hero-muted) }
+.hero .total { font: 500 clamp(34px, 7vw, 52px)/1.05 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; margin-top: 6px }
+.flow { display: flex; gap: 32px }
+.flow .num { font-size: 18px; display: block; margin-top: 2px }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px }
+.panel > .head { margin-bottom: 12px }
+.cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: start }
+.link { color: var(--brand); text-decoration: none; font-weight: 600; font-size: 14px; background: none; border: 0; padding: 0; cursor: pointer }
+.link:hover { text-decoration: underline }
+
+.accts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px }
+.acct { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.acct .bal { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; margin-top: 8px }
+.acct .name { font-weight: 600 }
+.goal { margin-top: 10px; font-size: 13px }
+.track { height: 6px; background: var(--soft); border-radius: 3px; overflow: hidden; margin-bottom: 6px }
+.track i { display: block; height: 100%; background: var(--gold); border-radius: 3px }
+.acct-wide { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px }
+.acct-wide .bal { margin: 0 }
+.acct-wide > div { min-width: 0 }
+
+.rows { list-style: none; margin: 0; padding: 0 }
+.rows li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 11px 0; border-top: 1px solid var(--line); align-items: baseline }
+.rows li:first-child { border-top: 0 }
+.rows .d { font-weight: 500; overflow-wrap: anywhere }
+.rows .m { font-size: 13px; color: var(--muted); grid-column: 1 }
+.rows .a { grid-row: 1; grid-column: 2; font-weight: 500 }
+.rows .in { color: var(--pos) }
+.day { padding: 14px 0 4px; border-top: 1px solid var(--line) }
+.day:first-child { border-top: 0; padding-top: 0 }
+.empty { color: var(--muted); padding: 18px 0 }
+
+.bars { display: flex; flex-direction: column; gap: 12px }
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 14px }
+.bar .track { grid-column: 1 / -1; margin: 0; height: 8px }
+.bar .track i { background: var(--brand) }
+
+.btn { background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 10px; padding: 11px 18px; font-weight: 600; cursor: pointer }
+.btn:hover { filter: brightness(1.08) }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line) }
+.btn.small { padding: 7px 12px; font-size: 14px }
+
+form { display: flex; flex-direction: column; gap: 16px; max-width: 520px }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; align-self: start; flex-wrap: wrap }
+.seg button { border: 0; background: none; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-weight: 500; color: var(--muted) }
+.seg button[aria-pressed="true"] { background: var(--soft); color: var(--ink) }
+.field { display: flex; flex-direction: column; gap: 6px }
+.field label { font-weight: 600; font-size: 14px }
+.field input, .field select, .filters input, .filters select { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); width: 100%; min-width: 0 }
+.amount input { font: 500 22px var(--mono) }
+.err { color: var(--neg); font-size: 14px; font-weight: 500 }
+.review { border: 1px solid var(--brand); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 12px; max-width: 520px }
+.review dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 18px }
+.review dt { color: var(--muted) } .review dd { margin: 0; font-weight: 500; overflow-wrap: anywhere }
+.actions { display: flex; gap: 10px; flex-wrap: wrap }
+.filters { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px }
+
+.card { width: 100%; max-width: 360px; aspect-ratio: 1.586; border-radius: 18px; background: var(--hero-bg); color: var(--hero-fg); padding: 22px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden }
+.card::after { content: ""; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; border: 36px solid var(--hero-muted); opacity: .16 }
+.card .pan { font: 500 19px var(--mono); letter-spacing: 0.08em }
+.card .brandline { font: 700 17px var(--display) }
+.card .label { color: var(--hero-muted) }
+.card.frozen { filter: grayscale(1); opacity: .7 }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--soft); color: var(--pos) }
+.pill.off { color: var(--neg) }
+.st { font-weight: 600 }
+.st-confirming { color: var(--ink) }
+.st-pending { color: var(--gold) }
+.st-successful { color: var(--pos) }
+.kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; margin: 0 }
+.kv dt { color: var(--muted) } .kv dd { margin: 0; font-weight: 500 }
+
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 10px; font-weight: 500; z-index: 30; max-width: calc(100% - 32px) }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 18px; padding-block: 14px 96px }
+  .rail { position: static; flex-direction: row; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap }
+  .rail-foot { flex-direction: row; align-items: center }
+  .rail-top { flex: 1 }
+  .rail-foot .demo { display: none }
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; flex-direction: row; background: var(--surface); border-top: 1px solid var(--line);
+    padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)) }
+  .nav a { flex: 1; text-align: center; padding: 9px 1px; font-size: 12px }
+  .cols, .accts { grid-template-columns: minmax(0, 1fr) }
+  .filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
+  .filters input { grid-column: 1 / -1 }
+  .hero { padding: 22px 20px }
+  .demo-m { display: block }
+  .nav .wide { display: none }
+  #reset { white-space: nowrap }
+}
+@media (prefers-reduced-motion: no-preference) { .track i { transition: width .4s ease } }
+.rail-foot { flex-wrap: wrap }
+.rail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+.chat-btn { position: relative; height: 44px; padding: 0 16px 0 13px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; white-space: nowrap; cursor: pointer; flex: none }
+.chat-btn:hover { background: var(--soft) }
+.chat-btn .dot { position: absolute; top: -2px; right: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--neg); border: 2px solid var(--surface) }
+.chat { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100% - 32px)); height: min(540px, calc(100% - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; z-index: 40; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 12px 40px rgba(0, 0, 0, .28) }
+.chat-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; background: var(--hero-bg); color: var(--hero-fg) }
+.chat-head h2 { font-size: 16px }
+.chat-head .link { color: var(--hero-muted) }
+.chat-log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px }
+.adm-log { flex: none; max-height: 260px; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px }
+.msg { max-width: 82%; align-self: flex-start; display: flex; flex-direction: column; gap: 2px }
+.msg span { background: var(--soft); padding: 8px 12px; border-radius: 14px; overflow-wrap: anywhere; white-space: pre-wrap }
+.msg small { font-size: 11px; color: var(--muted) }
+.msg.me { align-self: flex-end; align-items: flex-end }
+.msg.me span { background: var(--brand); color: var(--brand-ink) }
+.chat-form { flex-direction: row; gap: 8px; max-width: none }
+.chat .chat-form { padding: 10px; border-top: 1px solid var(--line) }
+.chat-form input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface) }
+.foot { font-size: 13px; color: var(--muted) }
+.av { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--soft); color: var(--ink); display: inline-grid; place-items: center; font-weight: 600; font-size: 13px; flex: none; overflow: hidden }
+.av.lg { width: 64px; height: 64px; font-size: 20px }
+.who { display: flex; align-items: center; gap: 12px; min-width: 0 }
+.who > span { min-width: 0; overflow-wrap: anywhere }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px }
+@media (max-width: 520px) { .two { grid-template-columns: minmax(0, 1fr) } }
+.photo-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap }
+.photo-pick input[type=file] { border: 0; padding: 0; background: none; width: auto; flex: 1; min-width: 0 }
+.ids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; width: 100% }
+.ids > div { background: var(--soft); border-radius: 10px; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; min-width: 0 }
+.ids .num { font-size: 16px; font-weight: 500 }
+.ids .label { display: block; margin-bottom: 2px }
+.copy { font-size: 13px; flex: none }
+@media (max-width: 520px) { .ids { grid-template-columns: minmax(0, 1fr) } }
+.stack { display: flex; flex-direction: column; gap: 22px; min-width: 0 }
+.tog { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer }
+.tog:first-of-type { border-top: 0 }
+.tog input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--brand); flex: none }
+.tog b { font-weight: 600; display: block }
+.tog small { display: block; color: var(--muted); font-size: 13px }
+.notice { border: 1px solid var(--gold); border-radius: 10px; padding: 10px 14px; background: var(--surface); font-weight: 500 }
+.adm { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px }
+.adm form { max-width: none }
+.brand .pill { font-family: var(--body) }
+.auth { display: grid; place-items: center; min-height: 80vh; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px }
+.auth-box { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 22px }
+.auth-box .brand { font-size: 22px }
+.auth-box form { max-width: none }
+.auth-box .btn { width: 100% }
+/* Back office palette: slate blue, so staff never mistake it for the customer site. */
+.staff { --bg: #EDF0F6; --surface: #FFFFFF; --ink: #141C2B; --muted: #566277; --line: #D3DAE7; --brand: #2B4C7E; --brand-ink: #FFFFFF; --soft: #E2E9F4; --pos: #1F6B4A; background: var(--bg); color: var(--ink); min-height: 100vh }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .staff { --bg: #0C111B; --surface: #141B29; --ink: #E6EBF5; --muted: #93A0B8; --line: #263146; --brand: #8FB2F0; --brand-ink: #0B1730; --soft: #1B2538; --pos: #6FD3A4 } }
+:root[data-theme="dark"] .staff { --bg: #0C111B; --surface: #141B29; --ink: #E6EBF5; --muted: #93A0B8; --line: #263146; --brand: #8FB2F0; --brand-ink: #0B1730; --soft: #1B2538; --pos: #6FD3A4 }
+.staffbar { background: var(--brand); color: var(--brand-ink); font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; padding: 7px max(16px, env(safe-area-inset-right, 0px)) 7px max(16px, env(safe-area-inset-left, 0px)) }
+.staff .pill:not(.off) { color: var(--brand) }
+</style>
+
+<div class="staff" id="staff" hidden>
+<div class="staffbar">Staff only · Back office</div>
+<section id="admin-area">
+  <div class="auth" id="admin-login">
+    <div class="auth-box">
+      <div class="brand">
+        <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--brand)"/><rect x="3.5" y="3.5" width="25" height="25" rx="4.5" fill="none" stroke="var(--brand-ink)" stroke-width="0.7" opacity="0.55"/><path d="M9.8 8.5h5a7.5 7.5 0 0 1 0 15h-5z" fill="none" stroke="var(--brand-ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 12.5v7M16.6 12.5v7" fill="none" stroke="var(--brand-ink)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="wm">DEM<small>BANK</small></span> <span class="pill">Back office</span>
+      </div>
+      <div class="panel">
+        <form id="alogin" novalidate>
+          <div><h1 id="alogin-title"></h1><p class="muted" id="alogin-sub" style="margin-top:6px"></p></div>
+          <div class="field"><label for="admin-user">Admin username</label><input id="admin-user" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+          <div class="field"><label for="admin-pass">Password</label><input id="admin-pass" type="password" autocomplete="off"></div>
+          <div class="field" id="admin-pass2-field"><label for="admin-pass2">Confirm password</label><input id="admin-pass2" type="password" autocomplete="off"></div>
+          <p class="err" id="alogin-err" role="alert" hidden></p>
+          <button class="btn" id="alogin-go" type="submit"></button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="adm" id="admin-dash" hidden>
+    <div class="head">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--brand)"/><rect x="3.5" y="3.5" width="25" height="25" rx="4.5" fill="none" stroke="var(--brand-ink)" stroke-width="0.7" opacity="0.55"/><path d="M9.8 8.5h5a7.5 7.5 0 0 1 0 15h-5z" fill="none" stroke="var(--brand-ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 12.5v7M16.6 12.5v7" fill="none" stroke="var(--brand-ink)" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="wm">DEM<small>BANK</small></span> <span class="pill">Back office</span>
+      </div>
+      <div class="actions" style="gap:18px"><a class="link" href="#overview">Customer site</a><button class="link" id="admin-out" type="button">Sign out</button></div>
+    </div>
+    <div class="accts" id="adm-stats"></div>
+    <div class="cols">
+      <div class="panel">
+        <div class="head"><h2>Customers</h2></div>
+        <ul class="rows" id="adm-users"></ul>
+        <form id="adm-add" novalidate style="margin-top:20px">
+          <h2>Add a customer</h2>
+          <div class="field"><label for="adm-new-photo">Picture <span class="muted" style="font-weight:400">(optional)</span></label>
+            <div class="photo-pick"><span class="av lg" id="adm-new-prev">?</span><input id="adm-new-photo" type="file" accept="image/*"></div></div>
+          <div class="two">
+            <div class="field"><label for="adm-new-first">First name</label><input id="adm-new-first" maxlength="40" autocomplete="off"></div>
+            <div class="field"><label for="adm-new-last">Last name</label><input id="adm-new-last" maxlength="40" autocomplete="off"></div>
+          </div>
+          <div class="field"><label for="adm-new-email">Email</label><input id="adm-new-email" type="email" maxlength="80" autocomplete="off"></div>
+          <div class="field"><label for="adm-new-dob">Date of birth</label><input id="adm-new-dob" type="date" autocomplete="off"></div>
+          <div class="field"><label for="adm-new-user">Username</label><input id="adm-new-user" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+          <div class="field"><label for="adm-new-pass">Password</label><input id="adm-new-pass" type="password" autocomplete="new-password"></div>
+          <p class="err" id="adm-add-err" role="alert" hidden></p>
+          <div class="actions"><button class="btn" type="submit">Add customer</button></div>
+        </form>
+      </div>
+      <div class="panel" id="adm-detail"></div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<section class="auth" id="auth" hidden>
+  <div class="auth-box">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--brand)"/><rect x="3.5" y="3.5" width="25" height="25" rx="4.5" fill="none" stroke="var(--brand-ink)" stroke-width="0.7" opacity="0.55"/><path d="M9.8 8.5h5a7.5 7.5 0 0 1 0 15h-5z" fill="none" stroke="var(--brand-ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 12.5v7M16.6 12.5v7" fill="none" stroke="var(--brand-ink)" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="wm">DEM<small>BANK</small></span>
+    </div>
+    <div class="panel">
+      <form id="login" novalidate>
+        <div><h1 id="login-title"></h1><p class="muted" id="login-sub" style="margin-top:6px"></p></div>
+        <div id="signup-fields" class="view" style="gap:16px">
+          <div class="two">
+            <div class="field"><label for="su-first">First name</label><input id="su-first" maxlength="40" autocomplete="given-name"></div>
+            <div class="field"><label for="su-last">Last name</label><input id="su-last" maxlength="40" autocomplete="family-name"></div>
+          </div>
+          <div class="field"><label for="su-email">Email</label><input id="su-email" type="email" maxlength="80" autocomplete="email"></div>
+          <div class="field"><label for="su-dob">Date of birth</label><input id="su-dob" type="date" autocomplete="bday"></div>
+        </div>
+        <div class="field"><label for="login-user">Username</label><input id="login-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="login-pass">Password</label><input id="login-pass" type="password"></div>
+        <div class="field" id="pass2-field"><label for="login-pass2">Confirm password</label><input id="login-pass2" type="password" autocomplete="new-password"></div>
+        <p class="err" id="login-err" role="alert" hidden></p>
+        <button class="btn" id="login-go" type="submit"></button>
+      </form>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><button class="link" id="login-switch" type="button"></button><a class="link" href="#staff">Staff sign-in</a></div>
+    <p class="muted" style="font-size:13px">Forgot your password? Ask the bank admin to reset it.</p>
+    <p class="muted" style="font-size:13px">Demo bank</p>
+  </div>
+</section>
+
+<div class="shell" id="app" hidden>
+  <aside class="rail">
+    <div class="rail-top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--brand)"/><rect x="3.5" y="3.5" width="25" height="25" rx="4.5" fill="none" stroke="var(--brand-ink)" stroke-width="0.7" opacity="0.55"/><path d="M9.8 8.5h5a7.5 7.5 0 0 1 0 15h-5z" fill="none" stroke="var(--brand-ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 12.5v7M16.6 12.5v7" fill="none" stroke="var(--brand-ink)" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="wm">DEM<small>BANK</small></span>
+    </div>
+    <button class="chat-btn" id="chat-open" type="button" aria-label="Chat with customer service"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H6.5L3 22.5V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg><span>Customer Service</span><span class="dot" id="chat-dot" hidden></span></button>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <a href="#overview">Home</a>
+      <a href="#accounts">Accounts</a>
+      <a href="#transfer">Transfer<span class="wide"> Money</span></a>
+      <a href="#activity">Activity</a>
+      <a href="#cards">Card</a>
+      <a href="#preferences">Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+
+    <section class="view" id="v-overview">
+      <p class="notice" id="low-note" hidden></p>
+      <div class="hero">
+        <div><div class="label">Total balance</div><div class="total" id="total"></div></div>
+        <div class="flow">
+          <div><span class="label">In, last 30 days</span><span class="num" id="flow-in"></span></div>
+          <div><span class="label">Out, last 30 days</span><span class="num" id="flow-out"></span></div>
+        </div>
+      </div>
+      <div class="accts" id="home-accts"></div>
+      <div class="cols">
+        <div class="panel">
+          <div class="head"><h2>Recent activity</h2><a class="link" href="#activity">See all</a></div>
+          <ul class="rows" id="recent"></ul>
+        </div>
+        <div class="panel">
+          <div class="head"><h2>Where it went</h2><span class="muted" style="font-size:13px">Last 30 days</span></div>
+          <div class="bars" id="bars"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-accounts" hidden>
+      <div class="head"><h1>Accounts</h1><a class="btn small" href="#transfer" style="text-decoration:none">Transfer Money</a></div>
+      <div class="view" id="acct-list" style="gap:14px"></div>
+    </section>
+
+    <section class="view" id="v-transfer" hidden>
+      <div class="head"><h1>Transfer Money</h1></div>
+      <div class="panel">
+        <form id="xfer" novalidate>
+          <div class="seg" role="group" aria-label="Transfer type">
+            <button type="button" id="mode-own" aria-pressed="true">Between my accounts</button>
+            <button type="button" id="mode-pay" aria-pressed="false">Pay someone</button>
+          </div>
+          <div class="field"><label for="from">From</label><select id="from"></select></div>
+          <div class="field" id="to-own"><label for="to">To</label><select id="to"></select></div>
+          <div class="field" id="to-pay" hidden><label for="to-num">To account number</label><input id="to-num" inputmode="numeric" maxlength="10" placeholder="10-digit account number" autocomplete="off"></div>
+          <div class="field amount"><label for="amount">Amount</label><input id="amount" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>
+          <div class="field"><label for="note">Note <span class="muted" style="font-weight:400">(optional)</span></label><input id="note" maxlength="60" placeholder="What's it for?"></div>
+          <p class="err" id="err" role="alert" hidden></p>
+          <div class="actions"><button class="btn" type="submit">Review transfer</button></div>
+        </form>
+        <div class="review" id="review" hidden>
+          <h2>Check the details</h2>
+          <dl id="review-dl"></dl>
+          <div class="field" id="pin-field" hidden><label for="pin">Transfer PIN</label><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+          <p class="err" id="pin-err" role="alert" hidden></p>
+          <div class="actions"><button class="btn" id="confirm" type="button">Send money</button><button class="btn ghost" id="edit" type="button">Edit</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="v-activity" hidden>
+      <div class="head"><h1>Activity</h1><span class="muted num" id="count"></span></div>
+      <div class="filters">
+        <input id="q" type="search" placeholder="Search merchants, people, categories" aria-label="Search activity">
+        <select id="f-acct" aria-label="Account"></select>
+        <select id="f-dir" aria-label="Direction"><option value="">In and out</option><option value="in">Money in</option><option value="out">Money out</option></select>
+      </div>
+      <div class="panel" id="ledger"></div>
+    </section>
+
+    <section class="view" id="v-cards" hidden>
+      <div class="head"><h1>Debit card</h1><span class="pill" id="card-state"></span></div>
+      <div class="cols">
+        <div class="view" style="gap:16px">
+          <div class="card" id="card">
+            <div class="brandline"><svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect x="0.6" y="0.6" width="30.8" height="30.8" rx="6.5" fill="none" stroke="var(--hero-muted)" stroke-width="1"/><path d="M9.8 8.5h5a7.5 7.5 0 0 1 0 15h-5z" fill="none" stroke="var(--hero-muted)" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 12.5v7M16.6 12.5v7" fill="none" stroke="var(--hero-muted)" stroke-width="1.5" stroke-linecap="round"/></svg><span class="wm">DEM<small>BANK</small></span></div>
+            <div>
+              <div class="pan">•••• •••• •••• 4821</div>
+              <div style="display:flex;justify-content:space-between;margin-top:10px"><div><div class="label">Cardholder</div><span id="holder"></span></div><div><div class="label">Expires</div><span class="num">09/29</span></div></div>
+            </div>
+          </div>
+          <div class="actions"><button class="btn" id="freeze" type="button"></button></div>
+          <p class="muted" id="freeze-note" style="max-width:360px"></p>
+        </div>
+        <div class="panel">
+          <div class="head"><h2>Card details</h2></div>
+          <dl class="kv">
+            <dt>Linked account</dt><dd>Everyday Checking</dd>
+            <dt>Daily purchase limit</dt><dd class="num" id="lim-buy"></dd>
+            <dt>Daily cash limit</dt><dd class="num" id="lim-cash"></dd>
+            <dt>Spent on card, last 30 days</dt><dd class="num" id="card-spent"></dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+    <section class="view" id="v-preferences" hidden>
+      <div class="head"><h1>Settings</h1></div>
+      <div class="cols">
+        <div class="stack">
+          <div class="panel">
+            <form id="profile" novalidate>
+              <h2>Personal details</h2>
+              <div class="field"><label for="pf-photo-in">Picture</label><div class="photo-pick"><span id="pf-photo"></span><input id="pf-photo-in" type="file" accept="image/*"><button class="link" id="pf-nophoto" type="button">Remove picture</button></div></div>
+              <div class="field"><label for="pf-user">Username</label><input id="pf-user" disabled></div>
+              <div class="field"><label for="pf-name">Full name</label><input id="pf-name" maxlength="60" autocomplete="name"></div>
+              <div class="field"><label for="pf-dob">Date of birth</label><input id="pf-dob" type="date" autocomplete="bday"></div>
+              <div class="field"><label for="pf-email">Email</label><input id="pf-email" type="email" maxlength="80" autocomplete="email"></div>
+              <div class="field"><label for="pf-phone">Phone</label><input id="pf-phone" type="tel" maxlength="24" autocomplete="tel"></div>
+              <div class="field"><label for="pf-addr">Home address</label><input id="pf-addr" maxlength="120" autocomplete="street-address"></div>
+              <p class="err" id="pf-err" role="alert" hidden></p>
+              <div class="actions"><button class="btn" type="submit">Save details</button></div>
+            </form>
+          </div>
+          <div class="panel">
+            <h2 style="margin-bottom:6px">Alerts and statements</h2>
+            <label class="tog"><input type="checkbox" id="pr-txAlerts"><span><b>Transaction alerts</b><small>Tell me when money enters or leaves my accounts.</small></span></label>
+            <label class="tog"><input type="checkbox" id="pr-loginAlerts"><span><b>Sign-in alerts</b><small>Tell me when my account is opened on a new device.</small></span></label>
+            <label class="tog"><input type="checkbox" id="pr-lowBal"><span><b>Low balance warning</b><small>Show a warning on Home when Everyday Checking drops below the amount below.</small></span></label>
+            <div class="field" style="margin:4px 0 12px 32px"><label for="pr-lowBalAmt">Warn me below</label><input id="pr-lowBalAmt" inputmode="decimal" autocomplete="off"></div>
+            <label class="tog"><input type="checkbox" id="pr-estatements"><span><b>Paperless statements</b><small>Monthly statements online instead of by post.</small></span></label>
+            <label class="tog"><input type="checkbox" id="pr-offers"><span><b>Offers and news</b><small>Occasional messages about new DEM Bank products.</small></span></label>
+            <p class="err" id="nt-err" role="alert" hidden></p>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="panel">
+            <form id="pwform" novalidate>
+              <h2>Change password</h2>
+              <div class="field"><label for="pw-cur">Current password</label><input id="pw-cur" type="password" autocomplete="current-password"></div>
+              <div class="field"><label for="pw-new">New password</label><input id="pw-new" type="password" autocomplete="new-password"></div>
+              <div class="field"><label for="pw-new2">Confirm new password</label><input id="pw-new2" type="password" autocomplete="new-password"></div>
+              <p class="err" id="pw-err" role="alert" hidden></p>
+              <div class="actions"><button class="btn" type="submit">Change password</button></div>
+            </form>
+          </div>
+          <div class="panel">
+            <form id="pinform" novalidate>
+              <div><h2>Transfer PIN</h2><p class="muted" id="pin-state" style="margin-top:6px"></p></div>
+              <div class="field"><label for="pin-pass">Account password</label><input id="pin-pass" type="password" autocomplete="current-password"></div>
+              <div class="field"><label for="pin-new">New 4-digit PIN</label><input id="pin-new" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+              <div class="field"><label for="pin-new2">Confirm PIN</label><input id="pin-new2" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+              <p class="err" id="pin-set-err" role="alert" hidden></p>
+              <div class="actions"><button class="btn" id="pin-go" type="submit"></button><button class="btn ghost" id="pin-off" type="button">Turn off PIN</button></div>
+            </form>
+          </div>
+          <div class="panel">
+            <form id="limform" novalidate>
+              <div><h2>Daily transfer limit</h2><p class="muted" style="margin-top:6px">The most you can send to other people in one day. The highest allowed is 10,000.</p></div>
+              <div class="field"><label for="lim-amt">Limit per day</label><input id="lim-amt" inputmode="decimal" autocomplete="off"></div>
+              <p class="err" id="lim-err" role="alert" hidden></p>
+              <div class="actions"><button class="btn" type="submit">Save limit</button></div>
+            </form>
+          </div>
+          <div class="panel">
+            <h2 style="margin-bottom:6px">Privacy</h2>
+            <label class="tog"><input type="checkbox" id="pr-hideBal"><span><b>Hide balances on Home</b><small>Show dots instead of amounts when the app opens.</small></span></label>
+          </div>
+        </div>
+      </div>
+    </section>
+    <p class="foot">Signed in as <b id="who"></b> · <button class="link" id="signout" type="button">Sign out</button></p>
+    <p class="foot" style="margin-top:-14px">Demo bank</p>
+  </main>
+  <div class="chat" id="chat" role="dialog" aria-label="Customer service chat" hidden>
+    <div class="chat-head"><h2>Customer service</h2><button class="link" id="chat-close" type="button">Close</button></div>
+    <div class="chat-log" id="chat-log"></div>
+    <form class="chat-form" id="chat-form" novalidate><input id="chat-text" maxlength="500" placeholder="Type your message" aria-label="Message" autocomplete="off"><button class="btn" type="submit">Send</button></form>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  var KEY = 'money-tracker-v2';
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var dayISO = function (ago) { var d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - ago); return d.toISOString(); };
+
+  function seed() {
+    var id = 0, t = [];
+    var add = function (ago, acct, desc, cat, amt) { t.push({ id: ++id, date: dayISO(ago), acct: acct, desc: desc, cat: cat, amt: amt }); };
+    return {
+      currency: 'USD', frozen: false, nextId: id + 1, txns: t,
+      accounts: [
+        { id: 'chk', name: 'Everyday Checking', type: 'Checking', num: '4821', opening: 0 },
+        { id: 'sav', name: 'Rainy Day Savings', type: 'Savings · 1.6% APY', num: '7306', opening: 0 },
+        { id: 'trv', name: 'Travel Fund', type: 'Savings goal', num: '1954', opening: 0, goal: 200000 }
+      ],
+      payees: [
+        { id: 'p1', name: 'Jordan Okafor', num: '2290' },
+        { id: 'p2', name: 'Priya Nair', num: '6617' },
+        { id: 'p3', name: 'Maple Court Property', num: '0043' }
+      ]
+    };
+  }
+
+  // DEM Bank's routing number. It starts with 50, a range no real US bank uses, so it can't point at another bank.
+  var ROUTING = '502611048';
+  var DBKEY = 'dem-db-v1', DB = null, CUR = null, S = seed();
+  try { DB = JSON.parse(localStorage.getItem(DBKEY)); } catch (e) {}
+  if (!DB || !DB.users) {
+    DB = { users: {}, admin: null };
+    try {
+      var oa = JSON.parse(localStorage.getItem('dem-auth-v1')), os = JSON.parse(localStorage.getItem(KEY));
+      if (oa && oa.user && oa.hash) DB.users[oa.user.toLowerCase()] = { user: oa.user, salt: oa.salt, hash: oa.hash, data: os && os.accounts && os.txns ? os : seed() };
+    } catch (e) {}
+  }
+  // Every account gets its own 10-digit account number, unique across all customers.
+  function findAcct(no) {
+    for (var k in DB.users) { var u = DB.users[k]; for (var i = 0; i < u.data.accounts.length; i++) if (u.data.accounts[i].no === no) return { k: k, u: u, a: u.data.accounts[i] }; }
+    return null;
+  }
+  function ensureNos() {
+    for (var k in DB.users) DB.users[k].data.accounts.forEach(function (a) {
+      if (a.no) return;
+      var n; do { n = String(1 + Math.floor(Math.random() * 9)); while (n.length < 10) n += Math.floor(Math.random() * 10); } while (findAcct(n));
+      a.no = n; a.num = n.slice(-4);
+    });
+    // Transfers sent before statuses existed were already paid out, so list them as successful.
+    for (var j in DB.users) DB.users[j].data.txns.forEach(function (t) {
+      if (t.status || t.cat !== 'Payments') return;
+      var m = /(\d{10})$/.exec(t.desc), hit = m && findAcct(m[1]);
+      if (hit) { t.status = 'successful'; t.toK = hit.k; t.toAcct = hit.a.id; }
+    });
+  }
+  var saveDB = function () { ensureNos(); try { localStorage.setItem(DBKEY, JSON.stringify(DB)); } catch (e) {} };
+  ensureNos();
+  var save = function () { if (CUR && DB.users[CUR]) { DB.users[CUR].data = S; saveDB(); } };
+
+  var money = function (c, signed, cur) {
+    var s = new Intl.NumberFormat(undefined, { style: 'currency', currency: cur || S.currency }).format(Math.abs(c) / 100);
+    return signed ? (c < 0 ? '−' : '+') + s : (c < 0 ? '−' + s : s);
+  };
+  var acct = function (id) { return S.accounts.filter(function (a) { return a.id === id; })[0]; };
+  var balance = function (id) { return S.txns.reduce(function (s, t) { return t.acct === id ? s + t.amt : s; }, acct(id).opening); };
+  var sorted = function () { return S.txns.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id; }); };
+  var recent30 = function () { var cut = dayISO(30); return S.txns.filter(function (t) { return t.date >= cut; }); };
+  var dayLabel = function (iso) {
+    var d = new Date(iso), n = new Date(); n.setHours(12, 0, 0, 0);
+    var diff = Math.round((n - d) / 864e5);
+    if (diff <= 0) return 'Today'; if (diff === 1) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  var ST = { confirming: 'Confirming', pending: 'Pending', successful: 'Successful' };
+  var statusTag = function (t) { return t.status ? ' · <span class="st st-' + t.status + '">' + ST[t.status] + '</span>' : ''; };
+  var row = function (t, showDay) {
+    return '<li><span class="d">' + esc(t.desc) + '</span><span class="a num' + (t.amt > 0 ? ' in' : '') + '">' + money(t.amt, true) +
+      '</span><span class="m">' + (showDay ? dayLabel(t.date) + ' · ' : '') + esc(t.cat) + ' · ' + esc(acct(t.acct).name) + (t.note ? ' · ' + esc(t.note) : '') + statusTag(t) + '</span></li>';
+  };
+  var goalHTML = function (a) {
+    if (!a.goal) return '';
+    var pct = Math.max(0, Math.min(100, Math.round(balance(a.id) / a.goal * 100)));
+    return '<div class="goal"><div class="track"><i style="width:' + pct + '%"></i></div><span class="muted">' + pct + '% of ' + money(a.goal) + ' goal</span></div>';
+  };
+
+  function renderOverview() {
+    var pr = prefs(DB.users[CUR]), low = CUR && pr.lowBal && balance('chk') < pr.lowBalAmt;
+    $('low-note').hidden = !low;
+    if (low) $('low-note').textContent = 'Everyday Checking is below your low balance warning of ' + money(pr.lowBalAmt) + '.';
+    $('total').textContent = pr.hideBal ? '••••••' : money(S.accounts.reduce(function (s, a) { return s + balance(a.id); }, 0));
+    var r = recent30().filter(function (t) { return t.cat !== 'Transfer'; });
+    $('flow-in').textContent = money(r.reduce(function (s, t) { return t.amt > 0 ? s + t.amt : s; }, 0));
+    $('flow-out').textContent = money(r.reduce(function (s, t) { return t.amt < 0 ? s - t.amt : s; }, 0));
+    $('home-accts').innerHTML = S.accounts.map(function (a) {
+      return '<div class="acct"><span class="name">' + esc(a.name) + '</span><span class="muted num" style="font-size:13px">•••• ' + a.num + '</span><span class="bal">' + (pr.hideBal ? '••••' : money(balance(a.id))) + '</span>' + goalHTML(a) + '</div>';
+    }).join('');
+    $('recent').innerHTML = sorted().slice(0, 7).map(function (t) { return row(t, true); }).join('') || '<li class="muted">No transactions yet.</li>';
+    var cats = {}; r.forEach(function (t) { if (t.amt < 0) cats[t.cat] = (cats[t.cat] || 0) - t.amt; });
+    var list = Object.keys(cats).map(function (k) { return [k, cats[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
+    var max = list.length ? list[0][1] : 1;
+    $('bars').innerHTML = list.length ? list.map(function (c) {
+      return '<div class="bar"><span>' + esc(c[0]) + '</span><span class="num">' + money(c[1]) + '</span><div class="track"><i style="width:' + Math.max(2, c[1] / max * 100) + '%"></i></div></div>';
+    }).join('') : '<p class="empty">No spending in the last 30 days.</p>';
+  }
+
+  function renderAccounts() {
+    $('acct-list').innerHTML = S.accounts.map(function (a) {
+      var n = S.txns.filter(function (t) { return t.acct === a.id; }).length;
+      return '<div class="acct acct-wide"><div><div class="name">' + esc(a.name) + '</div><div class="muted" style="font-size:13px">' + esc(a.type) + ' · ' + n + (n === 1 ? ' transaction' : ' transactions') + '</div>' + goalHTML(a) +
+        '</div><div style="text-align:right"><div class="bal">' + money(balance(a.id)) + '</div><div class="label">Available</div></div>' +
+        '<div class="ids"><div><span><span class="label">Account number</span><span class="num">' + a.no + '</span></span><button class="link copy" type="button" data-copy="' + a.no + '">Copy</button></div>' +
+        '<div><span><span class="label">Routing number</span><span class="num">' + ROUTING + '</span></span><button class="link copy" type="button" data-copy="' + ROUTING + '">Copy</button></div></div></div>';
+    }).join('');
+  }
+
+  $('acct-list').addEventListener('click', function (e) {
+    var v = e.target.getAttribute('data-copy'); if (!v) return;
+    var done = function () { toast('Copied ' + v); };
+    try { navigator.clipboard.writeText(v).then(done, function () { toast(v); }); } catch (err) { toast(v); }
+  });
+
+  var mode = 'own', pending = null;
+  function fillTransfer() {
+    var keepFrom = $('from').value, keepTo = $('to').value;
+    $('from').innerHTML = S.accounts.map(function (a) { return '<option value="' + a.id + '">' + esc(a.name) + ' · ' + money(balance(a.id)) + '</option>'; }).join('');
+    if (keepFrom) $('from').value = keepFrom;
+    $('to').innerHTML = S.accounts.map(function (a) { return '<option value="' + a.id + '">' + esc(a.name) + '</option>'; }).join('');
+    if (keepTo) $('to').value = keepTo;
+    if (!$('to').value || $('to').value === $('from').value) $('to').value = S.accounts.filter(function (a) { return a.id !== $('from').value; })[0].id;
+    $('to-own').hidden = mode !== 'own'; $('to-pay').hidden = mode !== 'pay';
+    $('mode-own').setAttribute('aria-pressed', mode === 'own'); $('mode-pay').setAttribute('aria-pressed', mode === 'pay');
+  }
+  function setMode(m) { mode = m; $('to').innerHTML = ''; fillTransfer(); showErr(''); }
+  function showErr(msg) { $('err').textContent = msg; $('err').hidden = !msg; }
+  function parseAmount(v) {
+    v = v.replace(/[,\s]/g, '');
+    if (!/^\d+(\.\d{1,2})?$/.test(v)) return NaN;
+    return Math.round(parseFloat(v) * 100);
+  }
+  function review(e) {
+    e.preventDefault();
+    var from = acct($('from').value), amt = parseAmount($('amount').value.trim());
+    var to, hit = null;
+    if (mode === 'own') to = acct($('to').value);
+    else {
+      var no = $('to-num').value.replace(/\s/g, '');
+      if (!/^\d{10}$/.test(no)) return showErr('Enter the 10-digit account number.');
+      hit = findAcct(no);
+      if (!hit) return showErr('No DEM Bank account has that number. Check it and try again.');
+      if (hit.k === CUR) return showErr('That is one of your own accounts. Use "Between my accounts" instead.');
+      to = { id: hit.a.id, name: fullName(hit.u) + ' · ' + no };
+    }
+    if (!from || !to) return showErr('Choose where the money goes.');
+    if (mode === 'own' && from.id === to.id) return showErr('Choose two different accounts.');
+    if (isNaN(amt) || amt <= 0) return showErr('Enter an amount like 25 or 25.50.');
+    if (amt > balance(from.id)) return showErr(from.name + ' has ' + money(balance(from.id)) + ' available. Enter a smaller amount.');
+    if (mode === 'pay') {
+      var lim = limitOf(DB.users[CUR]), left = Math.max(0, lim - sentToday());
+      if (amt > left) return showErr('This is over your daily transfer limit of ' + money(lim) + '. You can still send ' + money(left) + ' today.');
+    }
+    showErr('');
+    pending = { from: from, to: to, amt: amt, note: $('note').value.trim(), own: mode === 'own', hit: hit };
+    $('review-dl').innerHTML = '<dt>Amount</dt><dd class="num">' + money(amt) + '</dd><dt>From</dt><dd>' + esc(from.name) + '</dd><dt>To</dt><dd>' + esc(to.name) + '</dd>' +
+      (pending.note ? '<dt>Note</dt><dd>' + esc(pending.note) + '</dd>' : '') + '<dt>Balance after</dt><dd class="num">' + money(balance(from.id) - amt) + '</dd>';
+    $('pin-field').hidden = !DB.users[CUR].pin; $('pin').value = ''; setErr('pin-err', '');
+    $('xfer').hidden = true; $('review').hidden = false; (DB.users[CUR].pin ? $('pin') : $('confirm')).focus();
+  }
+  function confirmSend() {
+    var u = DB.users[CUR]; if (!pending || !u) return;
+    if (!u.pin) return doSend();
+    checkCred(u.pin, $('pin').value).then(function (ok) { if (ok) doSend(); else setErr('pin-err', 'That PIN is not right. Try again.'); });
+  }
+  function doSend() {
+    var p = pending; if (!p) return;
+    var now = new Date().toISOString();
+    var out = { id: S.nextId++, date: now, acct: p.from.id, desc: 'To ' + p.to.name, cat: p.own ? 'Transfer' : 'Payments', amt: -p.amt, note: p.note };
+    // A payment to another customer waits for the back office: the receiver is credited only when staff mark it successful.
+    if (!p.own) { out.status = 'confirming'; out.toK = p.hit.k; out.toAcct = p.hit.a.id; }
+    S.txns.push(out);
+    if (p.own) S.txns.push({ id: S.nextId++, date: now, acct: p.to.id, desc: 'From ' + p.from.name, cat: 'Transfer', amt: p.amt, note: p.note });
+    save(); pending = null;
+    $('amount').value = ''; $('note').value = ''; $('to-num').value = '';
+    $('review').hidden = true; $('xfer').hidden = false;
+    toast(p.own ? money(p.amt) + ' sent to ' + p.to.name : 'Transfer of ' + money(p.amt) + ' is confirming');
+    location.hash = 'activity'; renderAll();
+  }
+
+  function renderActivity() {
+    if (!$('f-acct').options.length) $('f-acct').innerHTML = '<option value="">All accounts</option>' + S.accounts.map(function (a) { return '<option value="' + a.id + '">' + esc(a.name) + '</option>'; }).join('');
+    var q = $('q').value.trim().toLowerCase(), fa = $('f-acct').value, fd = $('f-dir').value;
+    var list = sorted().filter(function (t) {
+      if (fa && t.acct !== fa) return false;
+      if (fd === 'in' && t.amt < 0) return false;
+      if (fd === 'out' && t.amt > 0) return false;
+      return !q || (t.desc + ' ' + t.cat + ' ' + (t.note || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    $('count').textContent = list.length + (list.length === 1 ? ' transaction' : ' transactions');
+    var html = '', last = '';
+    list.forEach(function (t) {
+      var d = dayLabel(t.date);
+      if (d !== last) { html += (last ? '</ul>' : '') + '<div class="day label">' + d + '</div><ul class="rows">'; last = d; }
+      html += row(t, false);
+    });
+    $('ledger').innerHTML = list.length ? html + '</ul>' : '<p class="empty">' + (S.txns.length ? 'Nothing matches. Clear the search or change the filters.' : 'No transactions yet.') + '</p>';
+  }
+
+  function renderCard() {
+    $('card').classList.toggle('frozen', S.frozen);
+    $('card-state').textContent = S.frozen ? 'Frozen' : 'Active';
+    $('card-state').classList.toggle('off', S.frozen);
+    $('freeze').textContent = S.frozen ? 'Unfreeze card' : 'Freeze card';
+    $('freeze-note').textContent = S.frozen ? 'New purchases and cash withdrawals are declined until you unfreeze the card.' : 'Lost sight of your card? Freeze it now and unfreeze it when it turns up.';
+    $('lim-buy').textContent = money(250000); $('lim-cash').textContent = money(50000);
+    $('card-spent').textContent = money(recent30().reduce(function (s, t) { return t.acct === 'chk' && t.amt < 0 && ['Transfer', 'Payments', 'Housing'].indexOf(t.cat) < 0 ? s - t.amt : s; }, 0));
+  }
+
+  var toastTimer;
+  function toast(msg) { var el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3200); }
+
+  function renderAll() { renderOverview(); renderAccounts(); fillTransfer(); renderActivity(); renderCard(); if (CUR) renderChat(); }
+  var VIEWS = ['overview', 'accounts', 'transfer', 'activity', 'cards', 'preferences'];
+  function route() {
+    var v = location.hash.slice(1); if (VIEWS.indexOf(v) < 0) v = 'overview';
+    VIEWS.forEach(function (n) { $('v-' + n).hidden = n !== v; });
+    document.querySelectorAll('.nav a').forEach(function (a) { if (a.getAttribute('href') === '#' + v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    window.scrollTo(0, 0);
+  }
+
+  $('xfer').addEventListener('submit', review);
+  $('confirm').addEventListener('click', confirmSend);
+  $('edit').addEventListener('click', function () { $('review').hidden = true; $('xfer').hidden = false; });
+  $('mode-own').addEventListener('click', function () { setMode('own'); });
+  $('mode-pay').addEventListener('click', function () { setMode('pay'); });
+  $('from').addEventListener('change', fillTransfer);
+  ['q', 'f-acct', 'f-dir'].forEach(function (id) { $(id).addEventListener('input', renderActivity); });
+  $('freeze').addEventListener('click', function () { S.frozen = !S.frozen; save(); renderCard(); toast(S.frozen ? 'Card frozen' : 'Card unfrozen'); });
+  renderAll(); route();
+
+  // Sign-in and admin. Logins and accounts live in this browser only (salted hashes in localStorage).
+  var SKEY = 'dem-session', ASKEY = 'dem-admin-session', creating = !Object.keys(DB.users).length, adminIn = false, SEL = null, delArmed = false, editOpen = false, editPhoto = null;
+  function digest(text) {
+    if (window.crypto && crypto.subtle && window.TextEncoder) {
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+      });
+    }
+    var h = 5381; for (var i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+    return Promise.resolve('x' + h);
+  }
+  function makeCred(pass) { var salt = String(Date.now()) + Math.random().toString(36).slice(2); return digest(salt + pass).then(function (h) { return { salt: salt, hash: h }; }); }
+  function checkCred(c, pass) { return digest(c.salt + pass).then(function (h) { return h === c.hash; }); }
+  function setErr(id, msg) { $(id).textContent = msg; $(id).hidden = !msg; return false; }
+  var BAD = 'That username or password is not right. Try again.';
+
+  function showAuth() {
+    $('app').hidden = true; $('auth').hidden = false;
+    $('login-title').textContent = creating ? 'Create your login' : 'Sign in';
+    $('login-sub').textContent = creating ? 'Tell us who you are, then choose a username and password for online banking.' : 'Welcome back. Enter your details to open your accounts.';
+    $('pass2-field').hidden = !creating; $('signup-fields').hidden = !creating;
+    $('login-go').textContent = creating ? 'Create login' : 'Sign in';
+    $('login-switch').textContent = creating ? 'I already have a login' : 'Create a login';
+    $('login-pass').setAttribute('autocomplete', creating ? 'new-password' : 'current-password');
+    $('login-pass').value = ''; $('login-pass2').value = ''; setErr('login-err', '');
+  }
+  function enter(k) {
+    CUR = k; S = DB.users[k].data;
+    try { sessionStorage.setItem(SKEY, k); } catch (e) {}
+    renderSettings();
+    $('f-acct').innerHTML = ''; renderAll(); gate();
+  }
+  function leave() { $('chat').hidden = true; CUR = null; S = seed(); try { sessionStorage.removeItem(SKEY); } catch (e) {} }
+  function gate() {
+    var staff = location.hash === '#staff';
+    $('staff').hidden = !staff;
+    if (staff) { $('auth').hidden = true; $('app').hidden = true; renderAdmin(); return; }
+    if (CUR) { $('auth').hidden = true; $('app').hidden = false; route(); } else showAuth();
+  }
+  $('login').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var user = $('login-user').value.trim(), k = user.toLowerCase(), pass = $('login-pass').value;
+    if (creating) {
+      var first = $('su-first').value.trim(), last = $('su-last').value.trim(), em = $('su-email').value.trim(), dob = $('su-dob').value;
+      if (!first || !last) return setErr('login-err', 'Enter your first and last name.');
+      if (!/^\S+@\S+\.\S+$/.test(em)) return setErr('login-err', 'Enter an email address like name@example.com.');
+      if (!dob) return setErr('login-err', 'Enter your date of birth.');
+      if (new Date(dob + 'T12:00:00') > new Date()) return setErr('login-err', 'Your date of birth cannot be in the future.');
+      if (user.length < 3) return setErr('login-err', 'Choose a username with at least 3 characters.');
+      if (DB.users[k]) return setErr('login-err', 'That username is taken. Choose another.');
+      if (pass.length < 8) return setErr('login-err', 'Use a password with at least 8 characters.');
+      if (pass !== $('login-pass2').value) return setErr('login-err', 'The two passwords do not match.');
+      makeCred(pass).then(function (c) {
+        DB.users[k] = { user: user, salt: c.salt, hash: c.hash, data: seed(), profile: { first: first, last: last, name: first + ' ' + last, email: em, dob: dob, photo: '' } };
+        ['su-first', 'su-last', 'su-email', 'su-dob'].forEach(function (id) { $(id).value = ''; });
+        saveDB(); creating = false; enter(k);
+      });
+    } else {
+      var u = DB.users[k];
+      if (!u) return setErr('login-err', BAD);
+      checkCred(u, pass).then(function (ok) { if (ok) enter(k); else setErr('login-err', BAD); });
+    }
+  });
+  $('login-switch').addEventListener('click', function () { creating = !creating; showAuth(); });
+  $('signout').addEventListener('click', function () { leave(); gate(); });
+
+  // Settings: personal details, security, limits and preferences, kept with the customer's record.
+  var PREFS = { txAlerts: true, loginAlerts: true, lowBal: false, estatements: true, offers: false, hideBal: false };
+  function prefs(u) { var p = (u && u.prefs) || {}, o = {}; for (var k in PREFS) o[k] = k in p ? p[k] : PREFS[k]; o.lowBalAmt = p.lowBalAmt || 10000; return o; }
+  function hideBal() { return prefs(DB.users[CUR]).hideBal; }
+  function limitOf(u) { return u.limit || 500000; }
+  function sentToday() { var d = new Date().toDateString(); return S.txns.reduce(function (s, t) { return t.cat === 'Payments' && t.amt < 0 && new Date(t.date).toDateString() === d ? s - t.amt : s; }, 0); }
+  function renderSettings() {
+    var u = DB.users[CUR]; if (!u) return;
+    var pf = u.profile || {}, pr = prefs(u);
+    $('pf-user').value = u.user; $('pf-photo').innerHTML = avatar(u, true); $('pf-nophoto').hidden = !pf.photo; $('pf-photo-in').value = '';
+    ['dob', 'email', 'phone', 'addr'].forEach(function (k) { $('pf-' + k).value = pf[k] || ''; }); $('pf-name').value = fullName(u) === u.user && !pf.name && !pf.first ? '' : fullName(u);
+    $('holder').textContent = fullName(u); $('who').textContent = fullName(u);
+    Object.keys(PREFS).forEach(function (k) { $('pr-' + k).checked = pr[k]; });
+    $('pr-lowBalAmt').value = (pr.lowBalAmt / 100).toFixed(2);
+    $('lim-amt').value = (limitOf(u) / 100).toFixed(2);
+    $('pin-state').textContent = u.pin ? 'Your transfer PIN is on. Every transfer asks for it.' : 'No transfer PIN yet. Set one so every transfer asks for it.';
+    $('pin-go').textContent = u.pin ? 'Change PIN' : 'Set PIN'; $('pin-off').hidden = !u.pin;
+    ['pw-cur', 'pw-new', 'pw-new2', 'pin-pass', 'pin-new', 'pin-new2'].forEach(function (id) { $(id).value = ''; });
+    ['pf-err', 'pw-err', 'pin-set-err', 'lim-err', 'nt-err'].forEach(function (id) { setErr(id, ''); });
+  }
+  $('profile').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = DB.users[CUR]; if (!u) return;
+    var email = $('pf-email').value.trim();
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) return setErr('pf-err', 'Enter an email address like name@example.com.');
+    var old = u.profile || {}, nm = $('pf-name').value.trim(), parts = nm.split(/\s+/);
+    u.profile = { name: nm, first: parts[0] || '', last: parts.slice(1).join(' '), dob: $('pf-dob').value, email: email, phone: $('pf-phone').value.trim(), addr: $('pf-addr').value.trim(), photo: old.photo || '' };
+    saveDB(); renderSettings(); toast('Details saved');
+  });
+  $('pf-photo-in').addEventListener('change', function () {
+    var u = DB.users[CUR]; if (!u) return;
+    readPhoto(this.files[0]).then(function (src) {
+      if (!src) return;
+      u.profile = u.profile || {}; u.profile.photo = src; saveDB(); renderSettings(); toast('Picture updated');
+    }, function () { setErr('pf-err', 'That picture could not be read. Choose a JPG or PNG image.'); });
+  });
+  $('pf-nophoto').addEventListener('click', function () {
+    var u = DB.users[CUR]; if (!u || !u.profile) return;
+    u.profile.photo = ''; saveDB(); renderSettings(); toast('Picture removed');
+  });
+  $('pwform').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = DB.users[CUR]; if (!u) return;
+    var cur = $('pw-cur').value, nw = $('pw-new').value;
+    if (nw.length < 8) return setErr('pw-err', 'Use a new password with at least 8 characters.');
+    if (nw !== $('pw-new2').value) return setErr('pw-err', 'The two new passwords do not match.');
+    checkCred(u, cur).then(function (ok) {
+      if (!ok) return setErr('pw-err', 'The current password is not right.');
+      return makeCred(nw).then(function (c) { u.salt = c.salt; u.hash = c.hash; saveDB(); renderSettings(); toast('Password changed'); });
+    });
+  });
+  $('pinform').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = DB.users[CUR]; if (!u) return;
+    var pin = $('pin-new').value;
+    if (!/^\d{4}$/.test(pin)) return setErr('pin-set-err', 'Enter a PIN of exactly 4 digits.');
+    if (pin !== $('pin-new2').value) return setErr('pin-set-err', 'The two PINs do not match.');
+    checkCred(u, $('pin-pass').value).then(function (ok) {
+      if (!ok) return setErr('pin-set-err', 'The account password is not right.');
+      return makeCred(pin).then(function (c) { u.pin = c; saveDB(); renderSettings(); toast('Transfer PIN saved'); });
+    });
+  });
+  $('pin-off').addEventListener('click', function () {
+    var u = DB.users[CUR]; if (!u || !u.pin) return;
+    checkCred(u, $('pin-pass').value).then(function (ok) {
+      if (!ok) return setErr('pin-set-err', 'Enter your account password above to turn off the PIN.');
+      delete u.pin; saveDB(); renderSettings(); toast('Transfer PIN turned off');
+    });
+  });
+  $('limform').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = DB.users[CUR]; if (!u) return;
+    var amt = parseAmount($('lim-amt').value.trim());
+    if (isNaN(amt) || amt <= 0 || amt > 1000000) return setErr('lim-err', 'Enter a limit between 1 and 10,000.');
+    u.limit = amt; saveDB(); renderSettings(); toast('Daily limit saved');
+  });
+  $('v-preferences').addEventListener('change', function (e) {
+    var u = DB.users[CUR], id = e.target.id || ''; if (!u || id.indexOf('pr-') !== 0) return;
+    u.prefs = u.prefs || {};
+    if (e.target.type === 'checkbox') u.prefs[id.slice(3)] = e.target.checked;
+    else {
+      var amt = parseAmount(e.target.value.trim());
+      if (isNaN(amt) || amt <= 0) return setErr('nt-err', 'Enter a warning amount like 100 or 100.50.');
+      u.prefs.lowBalAmt = amt; setErr('nt-err', '');
+    }
+    saveDB(); renderOverview(); toast('Settings saved');
+  });
+
+  // Customer pictures and names.
+  function fullName(u) { var pf = u.profile || {}; return pf.name || [pf.first, pf.last].filter(Boolean).join(' ') || u.user; }
+  function avatar(u, big) {
+    var pf = u.profile || {}, cls = 'av' + (big ? ' lg' : '');
+    if (pf.photo) return '<img class="' + cls + '" src="' + pf.photo + '" alt="">';
+    var ini = fullName(u).split(/\s+/).map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase();
+    return '<span class="' + cls + '" aria-hidden="true">' + esc(ini) + '</span>';
+  }
+  // Shrink a chosen picture to a 200px square so it fits in browser storage.
+  function readPhoto(file) {
+    return new Promise(function (ok, fail) {
+      if (!file) return ok('');
+      if (!/^image\//.test(file.type)) return fail(new Error('type'));
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var n = 200, c = document.createElement('canvas'), x = c.getContext('2d'), m = Math.min(img.width, img.height);
+        c.width = c.height = n;
+        x.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, n, n);
+        URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); fail(new Error('read')); };
+      img.src = url;
+    });
+  }
+
+  // Customer service chat. Messages are kept with the customer's record; staff read and reply in the back office.
+  function bubble(m, mine) {
+    return '<div class="msg' + (mine ? ' me' : '') + '"><span>' + esc(m.text) + '</span><small>' + dayLabel(m.at) + ', ' + new Date(m.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + '</small></div>';
+  }
+  function renderChat() {
+    var u = DB.users[CUR]; if (!u) return;
+    $('chat-log').innerHTML = (u.chat || []).map(function (m) { return bubble(m, m.from === 'c'); }).join('') || '<p class="muted">Send a message and customer service will reply here.</p>';
+    $('chat-log').scrollTop = $('chat-log').scrollHeight;
+    $('chat-dot').hidden = !u.chatUnreadC || !$('chat').hidden;
+  }
+  $('chat-open').addEventListener('click', function () {
+    var u = DB.users[CUR]; if (!u) return;
+    $('chat').hidden = false;
+    if (u.chatUnreadC) { u.chatUnreadC = 0; saveDB(); }
+    renderChat(); $('chat-text').focus();
+  });
+  $('chat-close').addEventListener('click', function () { $('chat').hidden = true; $('chat-open').focus(); });
+  $('chat-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = DB.users[CUR], text = $('chat-text').value.trim(); if (!u || !text) return;
+    (u.chat = u.chat || []).push({ from: 'c', text: text, at: new Date().toISOString() });
+    u.chatUnreadA = (u.chatUnreadA || 0) + 1; saveDB();
+    $('chat-text').value = ''; renderChat();
+  });
+
+  // Admin
+  var balOf = function (d, id) { return d.txns.reduce(function (s, t) { return t.acct === id ? s + t.amt : s; }, d.accounts.filter(function (a) { return a.id === id; })[0].opening); };
+  var totalOf = function (d) { return d.accounts.reduce(function (s, a) { return s + balOf(d, a.id); }, 0); };
+  function renderAdmin() {
+    var first = !DB.admin;
+    $('admin-login').hidden = adminIn; $('admin-dash').hidden = !adminIn;
+    if (!adminIn) {
+      $('alogin-title').textContent = first ? 'Set up admin access' : 'Admin sign in';
+      $('alogin-sub').textContent = first ? 'Choose the admin username and password for this bank.' : 'Staff only. Enter the admin details.';
+      $('admin-pass2-field').hidden = !first;
+      $('alogin-go').textContent = first ? 'Create admin login' : 'Sign in';
+      return;
+    }
+    var keys = Object.keys(DB.users).sort();
+    if (SEL && !DB.users[SEL]) SEL = null;
+    var conf = 0, frozen = 0, isConf = function (t) { return t.status === 'confirming'; };
+    keys.forEach(function (k) { conf += DB.users[k].data.txns.filter(isConf).length; if (DB.users[k].data.frozen) frozen++; });
+    $('adm-stats').innerHTML = [['Customers', keys.length], ['Transfers confirming', conf], ['Frozen cards', frozen]].map(function (s) {
+      return '<div class="acct"><span class="label">' + s[0] + '</span><span class="bal">' + s[1] + '</span></div>';
+    }).join('');
+    $('adm-users').innerHTML = keys.map(function (k) {
+      var u = DB.users[k], d = u.data, nc = d.txns.filter(isConf).length;
+      return '<li><span class="d who">' + avatar(u) + '<span>' + esc(fullName(u)) + (fullName(u) !== u.user ? ' <span class="muted" style="font-weight:400">@' + esc(u.user) + '</span>' : '') + '</span></span><span class="a num">' + money(totalOf(d), false, d.currency) + '</span><span class="m">' + (u.chatUnreadA ? '<span class="st">' + u.chatUnreadA + ' new message' + (u.chatUnreadA === 1 ? '' : 's') + '</span> · ' : '') + (nc ? '<span class="st">' + nc + ' confirming</span> · ' : '') + d.txns.length + (d.txns.length === 1 ? ' transaction' : ' transactions') + ' · Card ' + (d.frozen ? 'frozen' : 'active') +
+        ' · <button class="link" type="button" data-sel="' + esc(k) + '">' + (k === SEL ? 'Managing' : 'Manage') + '</button></span></li>';
+    }).join('') || '<li class="muted">No customers yet. Add one below.</li>';
+    if (!SEL) { $('adm-detail').innerHTML = '<p class="empty">Choose a customer to manage their accounts.</p>'; return; }
+    var u = DB.users[SEL], d = u.data, cur = d.currency;
+    var tx = d.txns.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id; });
+    $('adm-detail').innerHTML =
+      '<div class="head"><div class="who">' + avatar(u, true) + '<span><h2>' + esc(fullName(u)) + '</h2><span class="muted" style="font-size:13px">@' + esc(u.user) + '</span></span></div><span class="pill' + (d.frozen ? ' off' : '') + '">Card ' + (d.frozen ? 'frozen' : 'active') + '</span></div>' +
+      '<dl class="kv" style="margin:14px 0 18px">' +
+        '<dt>Email</dt><dd>' + esc((u.profile || {}).email || 'Not given') + '</dd>' +
+        '<dt>Date of birth</dt><dd>' + ((u.profile || {}).dob ? new Date((u.profile || {}).dob + 'T12:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not given') + '</dd>' +
+        ((u.profile || {}).phone ? '<dt>Phone</dt><dd>' + esc(u.profile.phone) + '</dd>' : '') +
+        ((u.profile || {}).addr ? '<dt>Address</dt><dd>' + esc(u.profile.addr) + '</dd>' : '') + '</dl>' +
+      (function (pf) {
+        var v = function (x) { return esc(x || ''); };
+        return '<details id="adm-edit-box" style="margin:-6px 0 18px"' + (editOpen ? ' open' : '') + '><summary class="link" style="cursor:pointer;display:inline-block">Edit details</summary>' +
+          '<form id="adm-edit" novalidate style="margin-top:14px">' +
+          '<div class="field"><label for="ed-photo">Picture</label><div class="photo-pick"><span id="ed-prev">' + avatar(u, true) + '</span><input id="ed-photo" type="file" accept="image/*">' +
+            (pf.photo ? '<button class="link" type="button" data-act="ed-nophoto">Remove picture</button>' : '') + '</div></div>' +
+          '<div class="two"><div class="field"><label for="ed-first">First name</label><input id="ed-first" maxlength="40" value="' + v(pf.first || (pf.name || '').split(/\s+/)[0]) + '"></div>' +
+          '<div class="field"><label for="ed-last">Last name</label><input id="ed-last" maxlength="40" value="' + v(pf.last || (pf.name || '').split(/\s+/).slice(1).join(' ')) + '"></div></div>' +
+          '<div class="field"><label for="ed-email">Email</label><input id="ed-email" type="email" maxlength="80" value="' + v(pf.email) + '"></div>' +
+          '<div class="field"><label for="ed-dob">Date of birth</label><input id="ed-dob" type="date" value="' + v(pf.dob) + '"></div>' +
+          '<div class="field"><label for="ed-phone">Phone</label><input id="ed-phone" type="tel" maxlength="24" value="' + v(pf.phone) + '"></div>' +
+          '<div class="field"><label for="ed-addr">Home address</label><input id="ed-addr" maxlength="120" value="' + v(pf.addr) + '"></div>' +
+          '<p class="err" id="ed-err" role="alert" hidden></p>' +
+          '<div class="actions"><button class="btn" type="submit">Save changes</button><button class="btn ghost" type="button" data-act="ed-cancel">Cancel</button></div></form></details>';
+      })(u.profile || {}) +
+      '<p class="muted" style="font-size:13px;margin-bottom:8px">Routing number <span class="num">' + ROUTING + '</span></p><dl class="kv">' + d.accounts.map(function (a) { return '<dt>' + esc(a.name) + ' <span class="num">' + a.no + '</span></dt><dd class="num">' + money(balOf(d, a.id), false, cur) + '</dd>'; }).join('') + '</dl>' +
+      '<h2 style="margin-top:22px">Customer transfers</h2><p class="muted" style="font-size:13px;margin-top:4px">Every transfer this customer sends shows as Confirming until you tap Pending or Successful.</p><ul class="rows">' +
+      (tx.filter(function (t) { return t.status; }).map(function (t) {
+        return '<li><span class="d">' + esc(t.desc) + '</span><span class="a num">' + money(-t.amt, false, cur) + '</span><span class="m">' + dayLabel(t.date) + statusTag(t) + '</span>' +
+          '<span class="m actions" style="margin-top:8px">' + ['pending', 'successful'].map(function (st) {
+            return '<button class="btn small' + (t.status === st ? '' : ' ghost') + '" type="button" data-act="st-' + st + '" data-id="' + t.id + '" aria-pressed="' + (t.status === st) + '">' + ST[st] + '</button>';
+          }).join('') + '</span></li>';
+      }).join('') || '<li class="muted">No transfers yet. When this customer pays someone, the transfer appears here for you to mark Pending or Successful.</li>') + '</ul>' +
+      '<h2 style="margin-top:22px">Messages</h2><div class="chat-log adm-log">' + ((u.chat || []).map(function (m) { return bubble(m, m.from === 'a'); }).join('') || '<p class="muted">No messages from this customer yet.</p>') + '</div>' +
+      '<form class="chat-form" id="adm-chat" novalidate style="margin-top:10px"><input id="adm-chat-text" maxlength="500" placeholder="Reply to ' + esc(fullName(u)) + '" aria-label="Reply" autocomplete="off"><button class="btn" type="submit">Send</button></form>' +
+      '<form id="adm-post" novalidate style="margin-top:20px"><h2>Post a transaction</h2>' +
+      '<div class="field"><label for="adm-acct">Account</label><select id="adm-acct">' + d.accounts.map(function (a) { return '<option value="' + a.id + '">' + esc(a.name) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="adm-kind">Type</label><select id="adm-kind"><option value="in">Credit (money in)</option><option value="out">Debit (money out)</option></select></div>' +
+      '<div class="field"><label for="adm-amt">Amount</label><input id="adm-amt" inputmode="decimal" placeholder="0.00" autocomplete="off"></div>' +
+      '<div class="field"><label for="adm-desc">Description</label><input id="adm-desc" maxlength="60" placeholder="Cash deposit at branch"></div>' +
+      '<p class="err" id="adm-post-err" role="alert" hidden></p><div class="actions"><button class="btn" type="submit">Post transaction</button></div></form>' +
+      '<form id="adm-pw" novalidate style="margin-top:20px"><h2>Reset password</h2>' +
+      '<div class="field"><label for="adm-pw-new">New password</label><input id="adm-pw-new" type="password" autocomplete="new-password"></div>' +
+      '<p class="err" id="adm-pw-err" role="alert" hidden></p><div class="actions"><button class="btn ghost" type="submit">Set new password</button></div></form>' +
+      '<div class="actions" style="margin-top:20px"><button class="btn ghost" type="button" data-act="freeze">' + (d.frozen ? 'Unfreeze card' : 'Freeze card') + '</button>' +
+      '<button class="btn ghost" type="button" data-act="delete">' + (delArmed ? 'Click again to delete ' + esc(u.user) : 'Delete customer') + '</button></div>' +
+      '<h2 style="margin-top:24px">Transactions</h2><ul class="rows">' + (tx.map(function (t) {
+        return '<li><span class="d">' + esc(t.desc) + '</span><span class="a num' + (t.amt > 0 ? ' in' : '') + '">' + money(t.amt, true, cur) + '</span><span class="m">' + dayLabel(t.date) + ' · ' + esc(t.cat) + ' · ' +
+          esc(d.accounts.filter(function (a) { return a.id === t.acct; })[0].name) + statusTag(t) +
+          ' · <button class="link" type="button" data-act="deltx" data-id="' + t.id + '">Delete</button></span></li>';
+      }).join('') || '<li class="muted">No transactions yet.</li>') + '</ul>';
+  }
+  function adminChanged() { saveDB(); creating = !Object.keys(DB.users).length; if (CUR && !DB.users[CUR]) leave(); if (CUR) renderAll(); renderAdmin(); }
+  $('alogin').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var user = $('admin-user').value.trim(), pass = $('admin-pass').value;
+    var done = function () { adminIn = true; try { sessionStorage.setItem(ASKEY, '1'); } catch (e) {} $('admin-pass').value = ''; $('admin-pass2').value = ''; setErr('alogin-err', ''); renderAdmin(); };
+    if (!DB.admin) {
+      if (user.length < 3) return setErr('alogin-err', 'Choose a username with at least 3 characters.');
+      if (pass.length < 8) return setErr('alogin-err', 'Use a password with at least 8 characters.');
+      if (pass !== $('admin-pass2').value) return setErr('alogin-err', 'The two passwords do not match.');
+      makeCred(pass).then(function (c) { DB.admin = { user: user, salt: c.salt, hash: c.hash }; saveDB(); done(); });
+    } else {
+      if (user.toLowerCase() !== DB.admin.user.toLowerCase()) return setErr('alogin-err', BAD);
+      checkCred(DB.admin, pass).then(function (ok) { if (ok) done(); else setErr('alogin-err', BAD); });
+    }
+  });
+  $('admin-out').addEventListener('click', function () { adminIn = false; SEL = null; try { sessionStorage.removeItem(ASKEY); } catch (e) {} renderAdmin(); });
+  $('adm-users').addEventListener('click', function (e) { var k = e.target.getAttribute('data-sel'); if (k) { SEL = k; delArmed = false; editOpen = false; editPhoto = null; if (DB.users[k].chatUnreadA) { DB.users[k].chatUnreadA = 0; saveDB(); } renderAdmin(); } });
+  $('adm-add').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var user = $('adm-new-user').value.trim(), k = user.toLowerCase(), pass = $('adm-new-pass').value;
+    var first = $('adm-new-first').value.trim(), last = $('adm-new-last').value.trim(), email = $('adm-new-email').value.trim(), dob = $('adm-new-dob').value;
+    if (!first || !last) return setErr('adm-add-err', 'Enter the customer\'s first and last name.');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return setErr('adm-add-err', 'Enter an email address like name@example.com.');
+    if (!dob) return setErr('adm-add-err', 'Enter the customer\'s date of birth.');
+    if (new Date(dob + 'T12:00:00') > new Date()) return setErr('adm-add-err', 'The date of birth cannot be in the future.');
+    if (user.length < 3) return setErr('adm-add-err', 'Enter a username with at least 3 characters.');
+    if (DB.users[k]) return setErr('adm-add-err', 'That username is taken. Choose another.');
+    if (pass.length < 8) return setErr('adm-add-err', 'Use a password with at least 8 characters.');
+    readPhoto($('adm-new-photo').files[0]).then(function (photo) {
+      return makeCred(pass).then(function (c) {
+        DB.users[k] = { user: user, salt: c.salt, hash: c.hash, data: seed(), profile: { first: first, last: last, name: first + ' ' + last, email: email, dob: dob, photo: photo } };
+        ['adm-new-user', 'adm-new-pass', 'adm-new-first', 'adm-new-last', 'adm-new-email', 'adm-new-dob', 'adm-new-photo'].forEach(function (id) { $(id).value = ''; });
+        $('adm-new-prev').innerHTML = '?'; setErr('adm-add-err', ''); SEL = k; adminChanged(); toast('Customer ' + first + ' ' + last + ' added');
+      });
+    }, function () { setErr('adm-add-err', 'That picture could not be read. Choose a JPG or PNG image.'); });
+  });
+  $('adm-new-photo').addEventListener('change', function () {
+    var f = this.files[0];
+    readPhoto(f).then(function (src) { $('adm-new-prev').innerHTML = src ? '<img class="av lg" src="' + src + '" alt="">' : '?'; setErr('adm-add-err', ''); },
+      function () { $('adm-new-prev').innerHTML = '?'; setErr('adm-add-err', 'That picture could not be read. Choose a JPG or PNG image.'); });
+  });
+  $('adm-detail').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = DB.users[SEL]; if (!u) return;
+    var d = u.data;
+    if (e.target.id === 'adm-edit') {
+      var first = $('ed-first').value.trim(), last = $('ed-last').value.trim(), em = $('ed-email').value.trim(), dob = $('ed-dob').value;
+      if (!first || !last) return setErr('ed-err', 'Enter the customer\'s first and last name.');
+      if (em && !/^\S+@\S+\.\S+$/.test(em)) return setErr('ed-err', 'Enter an email address like name@example.com.');
+      if (dob && new Date(dob + 'T12:00:00') > new Date()) return setErr('ed-err', 'The date of birth cannot be in the future.');
+      var old = u.profile || {};
+      u.profile = { first: first, last: last, name: first + ' ' + last, email: em, dob: dob, phone: $('ed-phone').value.trim(), addr: $('ed-addr').value.trim(), photo: editPhoto === null ? (old.photo || '') : editPhoto };
+      editOpen = false; editPhoto = null; adminChanged(); toast('Details saved for ' + u.profile.name);
+      return;
+    }
+    if (e.target.id === 'adm-chat') {
+      var text = $('adm-chat-text').value.trim(); if (!text) return;
+      (u.chat = u.chat || []).push({ from: 'a', text: text, at: new Date().toISOString() });
+      u.chatUnreadC = (u.chatUnreadC || 0) + 1; u.chatUnreadA = 0; adminChanged();
+      var log = document.querySelector('.adm-log'); if (log) log.scrollTop = log.scrollHeight;
+      return;
+    }
+    if (e.target.id === 'adm-post') {
+      var amt = parseAmount($('adm-amt').value.trim()), out = $('adm-kind').value === 'out', aid = $('adm-acct').value;
+      if (isNaN(amt) || amt <= 0) return setErr('adm-post-err', 'Enter an amount like 25 or 25.50.');
+      if (out && amt > balOf(d, aid)) return setErr('adm-post-err', 'This account has ' + money(balOf(d, aid), false, d.currency) + ' available. Enter a smaller amount.');
+      d.txns.push({ id: d.nextId++, date: new Date().toISOString(), acct: aid, desc: $('adm-desc').value.trim() || (out ? 'Withdrawal' : 'Deposit'), cat: out ? 'Withdrawal' : 'Deposit', amt: out ? -amt : amt });
+      adminChanged(); toast('Transaction posted');
+    } else if (e.target.id === 'adm-pw') {
+      var pass = $('adm-pw-new').value;
+      if (pass.length < 8) return setErr('adm-pw-err', 'Use a password with at least 8 characters.');
+      makeCred(pass).then(function (c) { u.salt = c.salt; u.hash = c.hash; adminChanged(); toast('Password reset for ' + u.user); });
+    }
+  });
+  $('adm-detail').addEventListener('toggle', function (e) { if (e.target.id === 'adm-edit-box') { editOpen = e.target.open; if (!editOpen) editPhoto = null; } }, true);
+  $('adm-detail').addEventListener('change', function (e) {
+    if (e.target.id !== 'ed-photo') return;
+    readPhoto(e.target.files[0]).then(function (src) { if (!src) return; editPhoto = src; $('ed-prev').innerHTML = '<img class="av lg" src="' + src + '" alt="">'; setErr('ed-err', ''); },
+      function () { setErr('ed-err', 'That picture could not be read. Choose a JPG or PNG image.'); });
+  });
+  $('adm-detail').addEventListener('click', function (e) {
+    var ea = e.target.getAttribute('data-act');
+    if (ea === 'ed-nophoto') { editPhoto = ''; $('ed-prev').innerHTML = '<span class="av lg">?</span>'; e.target.hidden = true; return; }
+    if (ea === 'ed-cancel') { editOpen = false; editPhoto = null; renderAdmin(); return; }
+    var act = e.target.getAttribute('data-act'), u = DB.users[SEL]; if (!act || !u) return;
+    if (act === 'freeze') { u.data.frozen = !u.data.frozen; adminChanged(); toast(u.data.frozen ? 'Card frozen' : 'Card unfrozen'); }
+    if (act === 'deltx') { var id = +e.target.getAttribute('data-id'); u.data.txns = u.data.txns.filter(function (t) { return t.id !== id; }); adminChanged(); toast('Transaction deleted'); }
+    if (act === 'st-successful' || act === 'st-pending') {
+      var tid = +e.target.getAttribute('data-id'), t = u.data.txns.filter(function (x) { return x.id === tid; })[0];
+      var want = act === 'st-pending' ? 'pending' : 'successful';
+      if (!t || !t.status || t.status === want) return;
+      var r = DB.users[t.toK], ra = r && r.data.accounts.filter(function (a) { return a.id === t.toAcct; })[0];
+      if (want === 'successful') {
+        if (!ra) { toast('The receiving customer no longer exists. Delete this transfer to return the money.'); return; }
+        t.creditId = r.data.nextId++;
+        r.data.txns.push({ id: t.creditId, date: new Date().toISOString(), acct: ra.id, desc: 'From ' + fullName(u), cat: 'Deposit', amt: -t.amt, note: t.note });
+      } else if (t.status === 'successful' && r) {
+        // Moving a paid transfer back to pending takes the money back out of the receiver's account.
+        var paid = r.data.txns.filter(function (x) { return t.creditId ? x.id === t.creditId : x.acct === t.toAcct && x.amt === -t.amt && (x.desc === 'From ' + fullName(u) || x.desc === 'From ' + u.user); })[0];
+        if (paid) r.data.txns = r.data.txns.filter(function (x) { return x !== paid; });
+        delete t.creditId;
+      }
+      t.status = want; adminChanged(); toast('Transfer marked ' + want);
+    }
+    if (act === 'delete') {
+      if (!delArmed) { delArmed = true; renderAdmin(); return; }
+      delArmed = false; delete DB.users[SEL]; SEL = null; adminChanged(); toast('Customer deleted');
+    }
+  });
+
+  window.addEventListener('hashchange', gate);
+  try { adminIn = !!DB.admin && sessionStorage.getItem(ASKEY) === '1'; } catch (e) {}
+  var sk = null; try { sk = sessionStorage.getItem(SKEY); } catch (e) {}
+  if (sk && DB.users[sk]) enter(sk); else gate();
+})();
+</script>
+
+</body>
+
+</html>
