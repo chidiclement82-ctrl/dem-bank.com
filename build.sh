@@ -15,7 +15,10 @@ mkdir -p dist
     "<link rel=\"icon\" type=\"image/png\" href=\"data:image/png;base64,$(base64 -w0 icon.png)\">" \
     '<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>' \
     '</head>' '<body>'
-  cat index.html
+  # Hosted copies can be reached by the public, so they always say this is a demo bank.
+  sed -e 's|<p class="muted" style="font-size:13px">Need a login, or forgot your password? Contact the bank.</p>|&\n    <p class="muted" style="font-size:13px">Demo bank</p>|' \
+      -e 's|<p class="foot">Signed in as <b id="who"></b> · <button class="link" id="signout" type="button">Sign out</button></p>|&\n    <p class="foot">Demo bank</p>|' \
+      -e 's|<div class="staffbar">Staff only · Back office</div>|<div class="staffbar">Staff only · Back office · Demo bank</div>|' index.html
   printf '\n%s\n' '</body>' '</html>'
 } > dist/index.html
 mkdir -p docs
