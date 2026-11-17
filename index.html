@@ -239,7 +239,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
         <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--brand)"/><rect x="3.5" y="3.5" width="25" height="25" rx="4.5" fill="none" stroke="var(--brand-ink)" stroke-width="0.7" opacity="0.55"/><path d="M9.8 8.5h5a7.5 7.5 0 0 1 0 15h-5z" fill="none" stroke="var(--brand-ink)" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 12.5v7M16.6 12.5v7" fill="none" stroke="var(--brand-ink)" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span class="wm">DEM<small>BANK</small></span> <span class="pill">Back office</span>
       </div>
-      <div class="actions" style="gap:18px"><a class="link" href="#overview">Customer site</a><button class="link" id="admin-out" type="button">Sign out</button></div>
+      <div class="actions" style="gap:18px"><button class="link" id="admin-out" type="button">Sign out</button></div>
     </div>
     <div class="accts" id="adm-stats"></div>
     <div class="cols">
@@ -277,23 +277,13 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
     </div>
     <div class="panel">
       <form id="login" novalidate>
-        <div><h1 id="login-title"></h1><p class="muted" id="login-sub" style="margin-top:6px"></p></div>
-        <div id="signup-fields" class="view" style="gap:16px">
-          <div class="two">
-            <div class="field"><label for="su-first">First name</label><input id="su-first" maxlength="40" autocomplete="given-name"></div>
-            <div class="field"><label for="su-last">Last name</label><input id="su-last" maxlength="40" autocomplete="family-name"></div>
-          </div>
-          <div class="field"><label for="su-email">Email</label><input id="su-email" type="email" maxlength="80" autocomplete="email"></div>
-          <div class="field"><label for="su-dob">Date of birth</label><input id="su-dob" type="date" autocomplete="bday"></div>
-        </div>
+        <div><h1>Sign in</h1><p class="muted" style="margin-top:6px">Welcome back. Enter your details to open your accounts.</p></div>
         <div class="field"><label for="login-user">Username</label><input id="login-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-        <div class="field"><label for="login-pass">Password</label><input id="login-pass" type="password"></div>
-        <div class="field" id="pass2-field"><label for="login-pass2">Confirm password</label><input id="login-pass2" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="login-pass">Password</label><input id="login-pass" type="password" autocomplete="current-password"></div>
         <p class="err" id="login-err" role="alert" hidden></p>
-        <button class="btn" id="login-go" type="submit"></button>
+        <button class="btn" id="login-go" type="submit">Sign in</button>
       </form>
     </div>
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><button class="link" id="login-switch" type="button" hidden></button><a class="link" href="#staff">Staff sign-in</a></div>
     <p class="muted" style="font-size:13px">Need a login, or forgot your password? Contact the bank.</p>
   </div>
 </section>
@@ -720,7 +710,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
   renderAll(); route();
 
   // Sign-in and admin. Logins and accounts live in this browser only (salted hashes in localStorage).
-  var SKEY = 'dem-session', ASKEY = 'dem-admin-session', creating = false, adminIn = false, SEL = null, delArmed = false, editOpen = false, editPhoto = null;
+  var SKEY = 'dem-session', ASKEY = 'dem-admin-session', adminIn = false, SEL = null, delArmed = false, editOpen = false, editPhoto = null;
   function digest(text) {
     if (window.crypto && crypto.subtle && window.TextEncoder) {
       return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
@@ -737,13 +727,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
 
   function showAuth() {
     $('app').hidden = true; $('auth').hidden = false;
-    $('login-title').textContent = creating ? 'Create your login' : 'Sign in';
-    $('login-sub').textContent = creating ? 'Tell us who you are, then choose a username and password for online banking.' : 'Welcome back. Enter your details to open your accounts.';
-    $('pass2-field').hidden = !creating; $('signup-fields').hidden = !creating;
-    $('login-go').textContent = creating ? 'Create login' : 'Sign in';
-    $('login-switch').textContent = creating ? 'I already have a login' : 'Create a login';
-    $('login-pass').setAttribute('autocomplete', creating ? 'new-password' : 'current-password');
-    $('login-pass').value = ''; $('login-pass2').value = ''; setErr('login-err', '');
+    $('login-pass').value = ''; setErr('login-err', '');
   }
   function enter(k) {
     CUR = k; S = DB.users[k].data;
@@ -761,26 +745,9 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
   $('login').addEventListener('submit', function (e) {
     e.preventDefault();
     var user = $('login-user').value.trim(), k = user.toLowerCase(), pass = $('login-pass').value;
-    if (creating) {
-      var first = $('su-first').value.trim(), last = $('su-last').value.trim(), em = $('su-email').value.trim(), dob = $('su-dob').value;
-      if (!first || !last) return setErr('login-err', 'Enter your first and last name.');
-      if (!/^\S+@\S+\.\S+$/.test(em)) return setErr('login-err', 'Enter an email address like name@example.com.');
-      if (!dob) return setErr('login-err', 'Enter your date of birth.');
-      if (new Date(dob + 'T12:00:00') > new Date()) return setErr('login-err', 'Your date of birth cannot be in the future.');
-      if (user.length < 3) return setErr('login-err', 'Choose a username with at least 3 characters.');
-      if (DB.users[k]) return setErr('login-err', 'That username is taken. Choose another.');
-      if (pass.length < 8) return setErr('login-err', 'Use a password with at least 8 characters.');
-      if (pass !== $('login-pass2').value) return setErr('login-err', 'The two passwords do not match.');
-      makeCred(pass).then(function (c) {
-        DB.users[k] = { user: user, salt: c.salt, hash: c.hash, data: seed(), profile: { first: first, last: last, name: first + ' ' + last, email: em, dob: dob, photo: '' } };
-        ['su-first', 'su-last', 'su-email', 'su-dob'].forEach(function (id) { $(id).value = ''; });
-        saveDB(); creating = false; enter(k);
-      });
-    } else {
-      var u = DB.users[k];
-      if (!u) return setErr('login-err', BAD);
-      checkCred(u, pass).then(function (ok) { if (ok) enter(k); else setErr('login-err', BAD); });
-    }
+    var u = DB.users[k];
+    if (!u) return setErr('login-err', BAD);
+    checkCred(u, pass).then(function (ok) { if (ok) enter(k); else setErr('login-err', BAD); });
   });
   
   $('signout').addEventListener('click', function () { leave(); gate(); });
