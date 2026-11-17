@@ -236,6 +236,17 @@ body { -webkit-tap-highlight-color: transparent }
 .staffbar { background: var(--brand); color: var(--brand-ink); font-size: 12.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; padding: 7px max(16px, env(safe-area-inset-right, 0px)) 7px max(16px, env(safe-area-inset-left, 0px)) }
 .staff .pill:not(.off) { color: var(--brand) }
 .seg .short { display: none }
+.pend-banner { border: 1px solid var(--gold); background: var(--surface); border-radius: var(--r); padding: 14px 16px; display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap }
+.pend-banner .pb-text { flex: 1 1 220px; min-width: 0 }
+.pend-banner b { display: block; margin-bottom: 2px }
+.pend-banner .muted { font-size: 14px }
+.pend-drop { position: fixed; z-index: 50; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); width: min(440px, calc(100% - 24px)); background: var(--surface); color: var(--ink); border: 1px solid var(--gold); border-radius: 16px; box-shadow: 0 14px 40px rgba(0, 0, 0, .25); padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start }
+.pend-drop .pend-ico { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); color: var(--gold) }
+.pend-drop .pend-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px }
+.pend-drop .pend-body span { color: var(--muted); font-size: 14px }
+.pend-drop .actions { margin-top: 8px }
+@media (prefers-reduced-motion: no-preference) { .pend-drop:not([hidden]) { animation: pend-in .35s cubic-bezier(.2, .8, .2, 1) } }
+@keyframes pend-in { from { transform: translate(-50%, -140%); opacity: 0 } to { transform: translate(-50%, 0); opacity: 1 } }
 /* Phone layout */
 @media (max-width: 860px) {
   input, select, textarea { font-size: 16px !important }
@@ -368,6 +379,7 @@ body { -webkit-tap-highlight-color: transparent }
   <main>
 
     <section class="view" id="v-overview">
+      <div class="pend-banner" id="pend-banner" role="status" hidden></div>
       <p class="notice" id="low-note" hidden></p>
       <div class="hero">
         <div><div class="label">Total balance</div><div class="total" id="total"></div></div>
@@ -527,6 +539,11 @@ body { -webkit-tap-highlight-color: transparent }
     <div class="chat-log" id="chat-log"></div>
     <form class="chat-form" id="chat-form" novalidate><input id="chat-text" maxlength="500" placeholder="Type your message" aria-label="Message" autocomplete="off"><button class="btn" type="submit">Send</button></form>
   </div>
+</div>
+<div class="pend-drop" id="pend-drop" role="alert" hidden>
+  <div class="pend-ico" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+  <div class="pend-body"><b id="pend-title"></b><span id="pend-text"></span>
+    <div class="actions"><button class="btn small" id="pend-contact" type="button">Contact customer service</button><button class="btn ghost small" id="pend-later" type="button">Later</button></div></div>
 </div>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -748,7 +765,7 @@ body { -webkit-tap-highlight-color: transparent }
   var toastTimer;
   function toast(msg) { var el = $('toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3200); }
 
-  function renderAll() { renderOverview(); renderAccounts(); fillTransfer(); renderActivity(); renderCard(); if (CUR) renderChat(); }
+  function renderAll() { renderOverview(); renderAccounts(); fillTransfer(); renderActivity(); renderCard(); if (CUR) { renderChat(); renderPending(); } }
   var VIEWS = ['overview', 'accounts', 'transfer', 'activity', 'cards', 'preferences'];
   function route() {
     var v = location.hash.slice(1); if (VIEWS.indexOf(v) < 0) v = 'overview';
@@ -793,7 +810,7 @@ body { -webkit-tap-highlight-color: transparent }
     renderSettings();
     $('f-acct').innerHTML = ''; renderAll(); gate();
   }
-  function leave() { $('chat').hidden = true; $('toast').hidden = true; CUR = null; S = seed(); try { sessionStorage.removeItem(SKEY); } catch (e) {} }
+  function leave() { $('chat').hidden = true; $('toast').hidden = true; $('pend-drop').hidden = true; CUR = null; S = seed(); try { sessionStorage.removeItem(SKEY); } catch (e) {} }
   function gate() {
     var staff = location.hash === '#staff';
     $('staff').hidden = !staff;
@@ -923,6 +940,42 @@ body { -webkit-tap-highlight-color: transparent }
     });
   }
 
+  // Pending transfers: a banner on Home while any transfer is pending, and a drop-down notice the first time each one is seen.
+  function pendingList() { return CUR && DB.users[CUR] ? DB.users[CUR].data.txns.filter(function (t) { return t.status === 'pending'; }) : []; }
+  function pendDesc(t) { return money(-t.amt) + ' ' + t.desc.replace(/^To /, 'to ').replace(/ · \d{10}$/, ''); }
+  var dropFor = null;
+  function renderPending() {
+    var list = pendingList(), b = $('pend-banner');
+    b.hidden = !list.length;
+    if (list.length) {
+      var one = list.length === 1;
+      b.innerHTML = '<div class="pb-text"><b>' + (one ? 'Your transfer is pending' : list.length + ' transfers are pending') + '</b><span class="muted">' +
+        (one ? 'Your transfer of ' + esc(pendDesc(list[0])) + ' is pending. ' : 'Some of your transfers are pending. ') +
+        'Contact customer service to complete ' + (one ? 'it' : 'them') + '.</span></div>' +
+        '<button class="btn small" type="button" data-pend="' + list[0].id + '">Contact customer service</button>';
+    }
+    var unseen = list.filter(function (t) { return !t.pendSeen; })[0];
+    if (unseen && $('pend-drop').hidden && $('chat').hidden) {
+      dropFor = unseen.id;
+      $('pend-title').textContent = 'Transfer pending';
+      $('pend-text').textContent = 'Your transfer of ' + pendDesc(unseen) + ' is pending. Please contact customer service about this transfer.';
+      $('pend-drop').hidden = false;
+    }
+    if (!list.length) $('pend-drop').hidden = true;
+  }
+  function markSeen(id) {
+    var t = DB.users[CUR] && DB.users[CUR].data.txns.filter(function (x) { return x.id === id; })[0];
+    if (t && !t.pendSeen) { t.pendSeen = true; saveDB(); }
+  }
+  function contactAbout(id) {
+    var t = DB.users[CUR] && DB.users[CUR].data.txns.filter(function (x) { return x.id === id; })[0];
+    $('pend-drop').hidden = true; if (t) markSeen(t.id);
+    openChat(t ? 'Hello, my transfer of ' + pendDesc(t) + ' on ' + new Date(t.date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + ' is pending. Please help me complete it.' : '');
+  }
+  $('pend-contact').addEventListener('click', function () { contactAbout(dropFor); });
+  $('pend-later').addEventListener('click', function () { markSeen(dropFor); $('pend-drop').hidden = true; renderPending(); });
+  $('pend-banner').addEventListener('click', function (e) { var id = e.target.getAttribute('data-pend'); if (id) contactAbout(+id); });
+
   // Customer service chat. Messages are kept with the customer's record; staff read and reply in the back office.
   function bubble(m, mine) {
     return '<div class="msg' + (mine ? ' me' : '') + '"><span>' + esc(m.text) + '</span><small>' + dayLabel(m.at) + ', ' + new Date(m.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + '</small></div>';
@@ -933,12 +986,15 @@ body { -webkit-tap-highlight-color: transparent }
     $('chat-log').scrollTop = $('chat-log').scrollHeight;
     $('chat-dot').hidden = !u.chatUnreadC || !$('chat').hidden;
   }
-  $('chat-open').addEventListener('click', function () {
+  function openChat(prefill) {
     var u = DB.users[CUR]; if (!u) return;
     $('chat').hidden = false;
     if (u.chatUnreadC) { u.chatUnreadC = 0; saveDB(); }
-    renderChat(); $('chat-text').focus();
-  });
+    renderChat();
+    if (prefill && !$('chat-text').value) $('chat-text').value = prefill;
+    $('chat-text').focus();
+  }
+  $('chat-open').addEventListener('click', function () { openChat(); });
   $('chat-close').addEventListener('click', function () { $('chat').hidden = true; $('chat-open').focus(); });
   $('chat-form').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -1127,6 +1183,7 @@ body { -webkit-tap-highlight-color: transparent }
         if (paid) r.data.txns = r.data.txns.filter(function (x) { return x !== paid; });
         delete t.creditId;
       }
+      if (want === 'pending') delete t.pendSeen;
       t.status = want; adminChanged(); toast('Transfer marked ' + want);
     }
     if (act === 'delete') {
@@ -1136,6 +1193,15 @@ body { -webkit-tap-highlight-color: transparent }
   });
 
   window.addEventListener('hashchange', gate);
+  function reloadDB() {
+    var fresh = null; try { fresh = JSON.parse(localStorage.getItem(DBKEY)); } catch (e) {}
+    if (!fresh || !fresh.users) return;
+    DB = fresh;
+    if (CUR) { if (!DB.users[CUR]) { leave(); gate(); return; } S = DB.users[CUR].data; renderSettings(); renderAll(); }
+    if (location.hash === '#staff') renderAdmin();
+  }
+  window.addEventListener('storage', function (e) { if (e.key === DBKEY) reloadDB(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) reloadDB(); });
   try { adminIn = !!DB.admin && sessionStorage.getItem(ASKEY) === '1'; } catch (e) {}
   var sk = null; try { sk = sessionStorage.getItem(SKEY); } catch (e) {}
   if (sk && DB.users[sk]) enter(sk); else gate();
