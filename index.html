@@ -293,8 +293,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
         <button class="btn" id="login-go" type="submit"></button>
       </form>
     </div>
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><button class="link" id="login-switch" type="button"></button><a class="link" href="#staff">Staff sign-in</a></div>
-    <p class="muted" style="font-size:13px">Forgot your password? Ask the bank admin to reset it.</p>
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><button class="link" id="login-switch" type="button" hidden></button><a class="link" href="#staff">Staff sign-in</a></div>
+    <p class="muted" style="font-size:13px">Need a login, or forgot your password? Contact the bank.</p>
   </div>
 </section>
 
@@ -720,7 +720,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
   renderAll(); route();
 
   // Sign-in and admin. Logins and accounts live in this browser only (salted hashes in localStorage).
-  var SKEY = 'dem-session', ASKEY = 'dem-admin-session', creating = !Object.keys(DB.users).length, adminIn = false, SEL = null, delArmed = false, editOpen = false, editPhoto = null;
+  var SKEY = 'dem-session', ASKEY = 'dem-admin-session', creating = false, adminIn = false, SEL = null, delArmed = false, editOpen = false, editPhoto = null;
   function digest(text) {
     if (window.crypto && crypto.subtle && window.TextEncoder) {
       return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
@@ -782,7 +782,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
       checkCred(u, pass).then(function (ok) { if (ok) enter(k); else setErr('login-err', BAD); });
     }
   });
-  $('login-switch').addEventListener('click', function () { creating = !creating; showAuth(); });
+  
   $('signout').addEventListener('click', function () { leave(); gate(); });
 
   // Settings: personal details, security, limits and preferences, kept with the customer's record.
@@ -1000,7 +1000,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left }
           ' · <button class="link" type="button" data-act="deltx" data-id="' + t.id + '">Delete</button></span></li>';
       }).join('') || '<li class="muted">No transactions yet.</li>') + '</ul>';
   }
-  function adminChanged() { saveDB(); creating = !Object.keys(DB.users).length; if (CUR && !DB.users[CUR]) leave(); if (CUR) renderAll(); renderAdmin(); }
+  function adminChanged() { saveDB(); if (CUR && !DB.users[CUR]) leave(); if (CUR) renderAll(); renderAdmin(); }
   $('alogin').addEventListener('submit', function (e) {
     e.preventDefault();
     var user = $('admin-user').value.trim(), pass = $('admin-pass').value;
